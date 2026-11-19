@@ -5,19 +5,21 @@ import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.view.Gravity
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
-
+import android.widget.*
+ 
 class MainActivity : Activity() {
+
+    private val languages = arrayOf("O‘zbekcha", "Русский", "English")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val root = LinearLayout(this)
-        root.orientation = LinearLayout.VERTICAL
-        root.setPadding(24, 45, 24, 24)
-        root.setBackgroundColor(Color.WHITE)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(24, 40, 24, 24)
+            setBackgroundColor(Color.WHITE)
+        }
 
         val title = TextView(this).apply {
             text = "SENSE AI"
@@ -26,46 +28,85 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
 
+        val languageSpinner = Spinner(this)
+        languageSpinner.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            languages
+        )
+
         val subtitle = TextView(this).apply {
-            text = "Bugun nimani o‘rganamiz?"
             textSize = 21f
             setTextColor(Color.DKGRAY)
             gravity = Gravity.CENTER
         }
 
         val description = TextView(this).apply {
-            text = "Kamera, ovoz va sun’iy intellekt yordamida yangi bilimlarni kashf eting."
             textSize = 15f
             setTextColor(Color.GRAY)
             gravity = Gravity.CENTER
         }
 
-        root.addView(title)
-        root.addView(subtitle)
-        root.addView(description)
+        val camera = Button(this)
+        val voice = Button(this)
+        val lessons = Button(this)
+        val progress = Button(this)
 
-        fun addMenuButton(label: String) {
-            val button = Button(this).apply {
-                text = label
-                textSize = 15f
-                isAllCaps = false
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.rgb(35, 105, 210))
+        fun updateLanguage(position: Int) {
+            when (position) {
+                0 -> {
+                    subtitle.text = "Bugun nimani o‘rganamiz?"
+                    description.text = "Ko‘r, tushun va yangi bilimlarni o‘rgan."
+                    camera.text = "📷 Kamera orqali o‘rganish"
+                    voice.text = "🎙 Ovoz orqali savol berish"
+                    lessons.text = "📚 Mening darslarim"
+                    progress.text = "📊 Bilimlarim va natijalarim"
+                }
+                1 -> {
+                    subtitle.text = "Что будем изучать сегодня?"
+                    description.text = "Смотри, понимай и изучай новое."
+                    camera.text = "📷 Обучение через камеру"
+                    voice.text = "🎙 Задать вопрос голосом"
+                    lessons.text = "📚 Мои уроки"
+                    progress.text = "📊 Мои знания и результаты"
+                }
+                2 -> {
+                    subtitle.text = "What shall we learn today?"
+                    description.text = "See, understand and discover new things."
+                    camera.text = "📷 Learn with camera"
+                    voice.text = "🎙 Ask by voice"
+                    lessons.text = "📚 My lessons"
+                    progress.text = "📊 My progress"
+                }
             }
-
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                62
-            )
-            params.setMargins(0, 12, 0, 4)
-            root.addView(button, params)
         }
 
-        addMenuButton("📷  Kamera orqali o‘rganish")
-        addMenuButton("🎙  Ovoz orqali savol berish")
-        addMenuButton("📚  Mening darslarim")
-        addMenuButton("📊  Bilimlarim va natijalarim")
+        root.addView(title)
+        root.addView(languageSpinner)
+        root.addView(subtitle)
+        root.addView(description)
+        root.addView(camera)
+        root.addView(voice)
+        root.addView(lessons)
+        root.addView(progress)
 
+        languageSpinner.onItemSelectedListener =
+            object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: android.widget.AdapterView<*>?,
+                    view: android.view.View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    updateLanguage(position)
+                }
+
+                override fun onNothingSelected(
+                    parent: android.widget.AdapterView<*>?
+                ) {}
+            }
+
+        updateLanguage(0)
         setContentView(root)
     }
 }
