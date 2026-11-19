@@ -15,6 +15,11 @@ function json(data, status = 200) {
   });
 }
 
+const MODELS = {
+  text: "@cf/zai-org/glm-4.7-flash",
+  vision: "@cf/moondream/moondream3.1-9B-A2B"
+};
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -30,14 +35,15 @@ export default {
       return json({
         name: "SENSE AI",
         status: "running",
-        ai: "Cloudflare Workers AI"
+        version: "2.0"
       });
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
       return json({
         status: "ok",
-        ai_binding: Boolean(env.AI)
+        ai_binding: Boolean(env.AI),
+        models: MODELS
       });
     }
 
@@ -45,20 +51,41 @@ export default {
       return json({ error: "Manzil topilmadi" }, 404);
     }
 
-    const length = Number(
+    if (!env.AI) {
+      return json({ error: "AI xizmati ulanmagan" }, 503);
+    }
+
+    const contentType = request.headers.get("Content-Type") || "";
+
+    if (!contentType.includes("application/json")) {
+      return json({ error: "JSON formatida yuboring" }, 415);
+    }
+
+    const declaredLength = Number(
       request.headers.get("Content-Length") || 0
     );
 
-    if (length > 5500000) {
-      return json({ error: "So‘rov juda katta" }, 413);
+    if (declaredLength > 5500000) {
+      return json({ error: "So‘rov hajmi juda katta" }, 413);
     }
 
+    let raw;
     let body;
 
     try {
-      body = await request.json();
+      raw = await request.text();
+
+      if (raw.length > 5500000) {
+        return json({ error: "So‘rov hajmi juda katta" }, 413);
+      }
+
+      body = JSON.parse(raw);
     } catch {
-      return json({ error: "JSON noto‘g‘ri" }, 400);
+      return json({ error: "JSON ma'lumoti noto‘g‘ri" }, 400);
+    }
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return json({ error: "So‘rov ma'lumoti noto‘g‘ri" }, 400);
     }
 
     const question = String(body.question || "").trim();
@@ -81,50 +108,56 @@ export default {
 
     const instruction =
       "Sen SENSE AI ta'lim yordamchisisan. " +
-      "Mavzularni sodda va bosqichma-bosqich tushuntir. " +
+      "Foydalanuvchiga mavzularni sodda va tushunarli tushuntir. " +
+      "Kerak bo‘lsa misollar keltir va bosqichma-bosqich izohla. " +
       "Javobni " + languageNames[language] + " ber. " +
-      "Bilmagan narsangni to‘qib chiqarmagin.";
+      "Bilmagan narsangni to‘qib chiqarmagin. " +
+      "Savolga bevosita javob ber.";
 
     try {
       let answer = "";
 
       if (body.image_base64) {
         const image = String(body.image_base64);
+
         const imageType = String(
           body.image_type || "image/jpeg"
         );
 
-        if (![
+        const allowedTypes = [
           "image/jpeg",
           "image/png",
           "image/webp"
-        ].includes(imageType)) {
-          return json({ error: "Rasm formati noto‘g‘ri" }, 400);
+        ];
+
+        if (!allowedTypes.includes(imageType)) {
+          return json({ error: "Rasm formati qo‘llab-quvvatlanmaydi" }, 400);
         }
 
         if (
           image.length > 4500000 ||
-          !/^[A-Za-z0-9+/=]+$/.test(image)
+          image.length < 20 ||
+          !/^[A-Za-z0-9+/]+={0,2}$/.test(image)
         ) {
-          return json({ error: "Rasm hajmi yoki ma'lumoti noto‘g‘ri" }, 400);
+          return json({ error: "Rasm ma'lumoti noto‘g‘ri" }, 400);
         }
 
         const result = await env.AI.run(
-          "@cf/moondream/moondream3.1-9B-A2B",
+          MODELS.vision,
           {
             task: "query",
             image: "data:" + imageType + ";base64," + image,
-            question: instruction + "\nSavol: " + question,
+            question: instruction + "\nFoydalanuvchi savoli: " + question,
             max_tokens: 700,
             stream: false
           }
         );
 
-        answer = result.answer || result.caption || "";
+        answer = result?.answer || result?.caption || "";
 
       } else {
         const result = await env.AI.run(
-          "@cf/zai-org/glm-4.7-flash",
+          MODELS.text,
           {
             messages: [
               {
@@ -136,29 +169,35 @@ export default {
                 content: question
               }
             ],
-            max_tokens: 900
+            max_tokens: 900,
+            stream: false
           }
         );
 
-        answer = result.response || "";
+        answer =
+          result?.response ||
+          result?.choices?.[0]?.message?.content ||
+          "";
       }
 
-      if (!answer) {
+      if (typeof answer !== "string" || !answer.trim()) {
         return json({
-          error: "AI javob qaytarmadi"
+          error: "AI javob qaytarmadi. Qayta urinib ko‘ring."
         }, 502);
       }
 
       return json({
         success: true,
-        answer: answer
+        answer: answer.trim(),
+        language: language
       });
 
     } catch (error) {
       return json({
-        error: "AI xizmati vaqtincha ishlamayapti"
+        success: false,
+        error: "AI xizmati vaqtincha ishlamayapti. Keyinroq urinib ko‘ring."
       }, 503);
     }
   }
 };
-            
+      
