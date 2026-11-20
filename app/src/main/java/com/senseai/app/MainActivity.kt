@@ -2,6 +2,7 @@
 package com.senseai.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.Manifest
 import android.content.Intent
